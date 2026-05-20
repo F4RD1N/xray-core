@@ -138,8 +138,7 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 				Writer: w,
 			}
 			go handler.Dispatch(ctxInner, link)
-			conn = net.NewConnection(net.ConnectionInput(r), net.ConnectionOutput(w))
-
+			conn = pipe.NewConnection(r, w)
 		} else {
 			conn, err = internet.DialSystem(ctxInner, dest, streamSettings.SocketSettings)
 			if err != nil {
@@ -388,7 +387,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 	requestURL.Path = transportConfiguration.GetNormalizedPath()
 	requestURL.RawQuery = transportConfiguration.GetNormalizedQuery()
 
-	httpClient, xmuxClient := getHTTPClient(ctx, dest, streamSettings, ohm, transportConfiguration.GetUploadOutboundTag())
+	httpClient, xmuxClient := getHTTPClient(ctx, dest, streamSettings, ohm, transportConfiguration.UploadOutboundTag)
 
 	mode := transportConfiguration.Mode
 	if mode == "" || mode == "auto" {
@@ -453,7 +452,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 		}
 		requestURL2.Path = config2.GetNormalizedPath()
 		requestURL2.RawQuery = config2.GetNormalizedQuery()
-		httpClient2, xmuxClient2 = getHTTPClient(ctx, dest2, memory2, ohm, config2.GetDownloadOutboundTag())
+		httpClient2, xmuxClient2 = getHTTPClient(ctx, dest2, memory2, ohm, config2.DownloadOutboundTag)
 		errors.LogInfo(ctx, fmt.Sprintf("XHTTP is downloading from %s, mode %s, HTTP version %s, host %s", dest2, "stream-down", httpVersion2, requestURL2.Host))
 	}
 
@@ -571,7 +570,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 
 				if xmuxClient != nil && (xmuxClient.LeftRequests.Add(-1) <= 0 ||
 					(xmuxClient.UnreusableAt != time.Time{} && lastWrite.After(xmuxClient.UnreusableAt))) {
-					httpClient, xmuxClient = getHTTPClient(ctx, dest, streamSettings, ohm, transportConfiguration.GetUploadOutboundTag())
+					httpClient, xmuxClient = getHTTPClient(ctx, dest, streamSettings, ohm, transportConfiguration.UploadOutboundTag)
 				}
 
 				go func() {
