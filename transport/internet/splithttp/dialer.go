@@ -23,8 +23,11 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/net/cnc"
+	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/common/signal/done"
 	"github.com/xtls/xray-core/common/uuid"
+	"github.com/xtls/xray-core/core"
+	"github.com/xtls/xray-core/features/outbound"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/browser_dialer"
 	"github.com/xtls/xray-core/transport/internet/hysteria/congestion"
@@ -40,6 +43,8 @@ import (
 type dialerConf struct {
 	net.Destination
 	*internet.MemoryStreamConfig
+	outbound.Manager
+	string
 }
 
 var (
@@ -47,7 +52,7 @@ var (
 	globalDialerAccess sync.Mutex
 )
 
-func getHTTPClient(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig) (DialerClient, *XmuxClient) {
+func getHTTPClient(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig, ohm outbound.Manager, tag string) (DialerClient, *XmuxClient) {
 	realityConfig := reality.ConfigFromStreamSettings(streamSettings)
 
 	if browser_dialer.HasBrowserDialer() && realityConfig == nil {
@@ -61,7 +66,7 @@ func getHTTPClient(ctx context.Context, dest net.Destination, streamSettings *in
 		globalDialerMap = make(map[dialerConf]*XmuxManager)
 	}
 
-	key := dialerConf{dest, streamSettings}
+	key := dialerConf{dest, streamSettings, ohm, tag}
 
 	xmuxManager, found := globalDialerMap[key]
 
@@ -73,7 +78,7 @@ func getHTTPClient(ctx context.Context, dest net.Destination, streamSettings *in
 		}
 
 		xmuxManager = NewXmuxManager(xmuxConfig, func() XmuxConn {
-			return createHTTPClient(dest, streamSettings)
+			return createHTTPClient(dest, streamSettings, ohm, tag)
 		})
 		globalDialerMap[key] = xmuxManager
 	}
@@ -101,7 +106,7 @@ func decideHTTPVersion(tlsConfig *tls.Config, realityConfig *reality.Config) str
 	return "2"
 }
 
-func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStreamConfig) DialerClient {
+func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStreamConfig, ohm outbound.Manager, tag string) DialerClient {
 	tlsConfig := tls.ConfigFromStreamSettings(streamSettings)
 	realityConfig := reality.ConfigFromStreamSettings(streamSettings)
 
@@ -119,9 +124,40 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 	transportConfig := streamSettings.ProtocolSettings.(*Config)
 
 	dialContext := func(ctxInner context.Context) (net.Conn, error) {
-		conn, err := internet.DialSystem(ctxInner, dest, streamSettings.SocketSettings)
-		if err != nil {
-			return nil, err
+		var conn net.Conn
+		var err error
+
+		if ohm != nil && tag != "" {
+			handler := ohm.GetHandler(tag)
+			if handler == nil {
+				return nil, errors.New("outbound handler not found: ", tag)
+			}
+			link, err := handler.Dispatch(ctxInner, dest)
+			if err != nil {
+				return nil, err
+			}
+			
+			r, w := io.Pipe()
+			
+			go func() {
+				defer w.Close()
+				buf.Copy(link.Reader, buf.NewWriter(w))
+			}()
+			
+			go func() {
+				defer link.Writer.Close()
+				buf.Copy(buf.NewReader(r), link.Writer)
+			}()
+
+			conn = &internet.Conn{
+				Reader: r,
+				Writer: w,
+			}
+		} else {
+			conn, err = internet.DialSystem(ctxInner, dest, streamSettings.SocketSettings)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if streamSettings.TcpmaskManager != nil {
@@ -323,6 +359,11 @@ func init() {
 }
 
 func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig) (stat.Connection, error) {
+	var ohm outbound.Manager
+	if space := core.MustSpaceFromContext(ctx); space != nil {
+		ohm = space.GetFeature(outbound.ManagerType()).(outbound.Manager)
+	}
+
 	tlsConfig := tls.ConfigFromStreamSettings(streamSettings)
 	realityConfig := reality.ConfigFromStreamSettings(streamSettings)
 
@@ -359,7 +400,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 	requestURL.Path = transportConfiguration.GetNormalizedPath()
 	requestURL.RawQuery = transportConfiguration.GetNormalizedQuery()
 
-	httpClient, xmuxClient := getHTTPClient(ctx, dest, streamSettings)
+	httpClient, xmuxClient := getHTTPClient(ctx, dest, streamSettings, ohm, transportConfiguration.UploadOutboundTag)
 
 	mode := transportConfiguration.Mode
 	if mode == "" || mode == "auto" {
@@ -424,7 +465,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 		}
 		requestURL2.Path = config2.GetNormalizedPath()
 		requestURL2.RawQuery = config2.GetNormalizedQuery()
-		httpClient2, xmuxClient2 = getHTTPClient(ctx, dest2, memory2)
+		httpClient2, xmuxClient2 = getHTTPClient(ctx, dest2, memory2, ohm, config2.DownloadOutboundTag)
 		errors.LogInfo(ctx, fmt.Sprintf("XHTTP is downloading from %s, mode %s, HTTP version %s, host %s", dest2, "stream-down", httpVersion2, requestURL2.Host))
 	}
 
@@ -542,7 +583,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 
 				if xmuxClient != nil && (xmuxClient.LeftRequests.Add(-1) <= 0 ||
 					(xmuxClient.UnreusableAt != time.Time{} && lastWrite.After(xmuxClient.UnreusableAt))) {
-					httpClient, xmuxClient = getHTTPClient(ctx, dest, streamSettings)
+					httpClient, xmuxClient = getHTTPClient(ctx, dest, streamSettings, ohm, transportConfiguration.UploadOutboundTag)
 				}
 
 				go func() {
