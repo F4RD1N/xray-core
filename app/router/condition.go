@@ -289,39 +289,6 @@ func (m *AttributeMatcher) Apply(ctx routing.Context) bool {
 	return m.Match(attributes)
 }
 
-type MethodMatcher struct {
-	methods []string
-}
-
-func NewMethodMatcher(methods []string) *MethodMatcher {
-	mCopy := make([]string, 0, len(methods))
-
-	for _, m := range methods {
-		if len(m) > 0 {
-			mCopy = append(mCopy, m)
-		}
-	}
-
-	return &MethodMatcher{
-		methods: mCopy,
-	}
-}
-
-// Apply implements Condition.
-func (m *MethodMatcher) Apply(ctx routing.Context) bool {
-	method := ctx.GetHTTPMethod()
-	if len(method) == 0 {
-		return false
-	}
-	for _, p := range m.methods {
-		if strings.HasPrefix(method, p) {
-			return true
-		}
-	}
-	return false
-}
-
-
 type ProcessNameMatcher struct {
 	ProcessNames  []string
 	AbsPaths      []string

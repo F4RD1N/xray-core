@@ -23,11 +23,11 @@ import (
 	"github.com/xtls/xray-core/common/errors"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/net/cnc"
-	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/common/signal/done"
 	"github.com/xtls/xray-core/common/uuid"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/outbound"
+	"github.com/xtls/xray-core/transport"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/browser_dialer"
 	"github.com/xtls/xray-core/transport/internet/hysteria/congestion"
@@ -132,27 +132,14 @@ func createHTTPClient(dest net.Destination, streamSettings *internet.MemoryStrea
 			if handler == nil {
 				return nil, errors.New("outbound handler not found: ", tag)
 			}
-			link, err := handler.Dispatch(ctxInner, dest)
-			if err != nil {
-				return nil, err
-			}
-			
-			r, w := io.Pipe()
-			
-			go func() {
-				defer w.Close()
-				buf.Copy(link.Reader, buf.NewWriter(w))
-			}()
-			
-			go func() {
-				defer link.Writer.Close()
-				buf.Copy(buf.NewReader(r), link.Writer)
-			}()
-
-			conn = &internet.Conn{
+			r, w := pipe.New(pipe.WithoutSizeLimit())
+			link := &transport.Link{
 				Reader: r,
 				Writer: w,
 			}
+			go handler.Dispatch(ctxInner, link)
+			conn = net.NewConnection(net.ConnectionInput(r), net.ConnectionOutput(w))
+
 		} else {
 			conn, err = internet.DialSystem(ctxInner, dest, streamSettings.SocketSettings)
 			if err != nil {
@@ -360,8 +347,9 @@ func init() {
 
 func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig) (stat.Connection, error) {
 	var ohm outbound.Manager
-	if space := core.MustSpaceFromContext(ctx); space != nil {
-		ohm = space.GetFeature(outbound.ManagerType()).(outbound.Manager)
+	v := core.MustFromContext(ctx)
+	if v != nil {
+		ohm = v.GetFeature(outbound.ManagerType()).(outbound.Manager)
 	}
 
 	tlsConfig := tls.ConfigFromStreamSettings(streamSettings)
@@ -400,7 +388,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 	requestURL.Path = transportConfiguration.GetNormalizedPath()
 	requestURL.RawQuery = transportConfiguration.GetNormalizedQuery()
 
-	httpClient, xmuxClient := getHTTPClient(ctx, dest, streamSettings, ohm, transportConfiguration.UploadOutboundTag)
+	httpClient, xmuxClient := getHTTPClient(ctx, dest, streamSettings, ohm, transportConfiguration.GetUploadOutboundTag())
 
 	mode := transportConfiguration.Mode
 	if mode == "" || mode == "auto" {
@@ -465,7 +453,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 		}
 		requestURL2.Path = config2.GetNormalizedPath()
 		requestURL2.RawQuery = config2.GetNormalizedQuery()
-		httpClient2, xmuxClient2 = getHTTPClient(ctx, dest2, memory2, ohm, config2.DownloadOutboundTag)
+		httpClient2, xmuxClient2 = getHTTPClient(ctx, dest2, memory2, ohm, config2.GetDownloadOutboundTag())
 		errors.LogInfo(ctx, fmt.Sprintf("XHTTP is downloading from %s, mode %s, HTTP version %s, host %s", dest2, "stream-down", httpVersion2, requestURL2.Host))
 	}
 
@@ -583,7 +571,7 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 
 				if xmuxClient != nil && (xmuxClient.LeftRequests.Add(-1) <= 0 ||
 					(xmuxClient.UnreusableAt != time.Time{} && lastWrite.After(xmuxClient.UnreusableAt))) {
-					httpClient, xmuxClient = getHTTPClient(ctx, dest, streamSettings, ohm, transportConfiguration.UploadOutboundTag)
+					httpClient, xmuxClient = getHTTPClient(ctx, dest, streamSettings, ohm, transportConfiguration.GetUploadOutboundTag())
 				}
 
 				go func() {
