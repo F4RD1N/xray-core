@@ -41,31 +41,60 @@ func init() {
 // --- تابع اختصاصی شما برای بازگردانی پورت فیک به واقعی ---
 func restorePort(p net.Port) net.Port {
 	val := uint16(p)
+	var restored uint16
+
 	switch val {
 	// پورت‌های HTTPS
-	case 2087: return 443
-	case 2096: return 8443
-	case 2083: return 2053
+	case 2087: restored = 443
+	case 443: restored = 2087
+
+	case 2096: restored = 8443
+	case 8443: restored = 2096
+
+	case 2083: restored = 2053
+	case 2053: restored = 2083
+
 	// پورت‌های HTTP
-	case 2086: return 80
-	case 2095: return 8080
-	case 8880: return 2052
+	case 2086: restored = 80
+	case 80: restored = 2086
+
+	case 2095: restored = 8080
+	case 8080: restored = 2095
+
+	case 8880: restored = 2052
+	case 2052: restored = 8880
+
+	default:
+		// تغییر متقارن ارقام برای سایر پورت‌ها (و برعکس)
+		s := strconv.Itoa(int(val))
+		var res []rune
+		for _, r := range s {
+			switch r {
+			case '1': res = append(res, '3')
+			case '3': res = append(res, '1')
+
+			case '2': res = append(res, '5')
+			case '5': res = append(res, '2')
+
+			case '4': res = append(res, '6')
+			case '6': res = append(res, '4')
+
+			case '7': res = append(res, '9')
+			case '9': res = append(res, '7')
+
+			case '8': res = append(res, '0')
+			case '0': res = append(res, '8')
+
+			default: res = append(res, r) // ارقامی که تغییر نمی‌کنند
+			}
+		}
+		parsed, _ := strconv.Atoi(string(res))
+		restored = uint16(parsed)
 	}
 
-	// بازگردانی پورت‌های کاستوم (تغییر ارقام)
-	s := strconv.Itoa(int(val))
-	var res []rune
-	for _, r := range s {
-		switch r {
-		case '3': res = append(res, '1')
-		case '5': res = append(res, '2')
-		case '6': res = append(res, '4')
-		case '9': res = append(res, '7')
-		case '0': res = append(res, '8')
-		default: res = append(res, r)
-		}
-	}
-	restored, _ := strconv.Atoi(string(res))
+	// لاگ گرفتن مقدار اولیه و مقدار نهایی برای دیباگ
+	log.Printf("[fardin] Port Mapping: Original=%d -> Restored=%d\n", val, restored)
+
 	return net.Port(restored)
 }
 // --------------------------------------------------------

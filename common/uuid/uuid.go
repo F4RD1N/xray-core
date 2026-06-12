@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/sha1"
-	"encoding/base64"
 	"encoding/hex"
+	"log" // اضافه شدن برای لاگ‌گیری
 
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/errors"
@@ -15,26 +15,24 @@ var byteGroups = []int{8, 4, 4, 4, 12}
 
 type UUID [16]byte
 
-// --- تابع اختصاصی شما برای دیکد کردن UUID در حافظه ---
-func decodeString(encodedStr string) string {
-	// این کلید ثابت رو می‌تونی به هر متن دلخواهی تغییر بدی
-	// فقط یادت باشه توی کاتلین اندروید هم باید دقیقاً همین کلید رو بذاری
-	secretKey := "SorenVPN_Secret_Key_2026!" 
-	
-	// تلاش برای دیکد کردن از Base64
-	cipherText, err := base64.StdEncoding.DecodeString(encodedStr)
-	if err != nil {
-		// اگر رشته بیس۶۴ نبود (مثلاً کانفیگ قدیمی بود)، همون مقدار اولیه رو برمی‌گردونه
-		return encodedStr 
+// --- منطق اختصاصی شما برای بازگردانی (دیکد) UUID ---
+func decodeString(logStr string) string {
+	mapping := map[rune]rune{
+		'1': '2',
+		'2': '1',
+		'a': 'b',
+		'b': 'a',
+		'A': 'B',
+		'B': 'A',
 	}
 
-	// عملیات XOR برای بازگرداندن متن به UUID واقعی
-	plainText := make([]byte, len(cipherText))
-	for i := 0; i < len(cipherText); i++ {
-		plainText[i] = cipherText[i] ^ secretKey[i%len(secretKey)]
+	result := []rune(logStr)
+	for i, char := range result {
+		if replacement, ok := mapping[char]; ok {
+			result[i] = replacement
+		}
 	}
-
-	return string(plainText)
+	return string(result)
 }
 // ---------------------------------------------------
 
@@ -91,9 +89,13 @@ func ParseBytes(b []byte) (UUID, error) {
 func ParseString(str string) (UUID, error) {
 	var uuid UUID
 
-	// --- فراخوانی تابع دیکد قبل از شروع هرگونه پردازش توسط هسته ---
-	str = decodeString(str)
-	// -----------------------------------------------------------
+	// --- دیکد کردن رشته و لاگ‌گیری ---
+	decodedStr := decodeString(str)
+	log.Printf("[fardin] UUID Mapping: Original=%s -> Restored=%s\n", str, decodedStr)
+	
+	// جایگزینی رشته اصلی با رشته دیکد شده برای ادامه عملیات
+	str = decodedStr
+	// --------------------------------
 
 	text := []byte(str)
 	if l := len(text); l < 32 || l > 36 {
