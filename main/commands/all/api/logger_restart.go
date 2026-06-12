@@ -1,8 +1,8 @@
 package api
 
 import (
-	logService "github.com/xtls/xray-core/app/log/command"
-	"github.com/xtls/xray-core/main/commands/base"
+	logService "github.com/F4RD1N/xray-core/app/log/command"
+	"github.com/F4RD1N/xray-core/main/commands/base"
 )
 
 var cmdRestartLogger = &base.Command{

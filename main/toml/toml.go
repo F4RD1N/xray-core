@@ -4,13 +4,13 @@ import (
 	"context"
 	"io"
 
-	"github.com/xtls/xray-core/common"
-	"github.com/xtls/xray-core/common/cmdarg"
-	"github.com/xtls/xray-core/common/errors"
-	"github.com/xtls/xray-core/core"
-	"github.com/xtls/xray-core/infra/conf"
-	"github.com/xtls/xray-core/infra/conf/serial"
-	"github.com/xtls/xray-core/main/confloader"
+	"github.com/F4RD1N/xray-core/common"
+	"github.com/F4RD1N/xray-core/common/cmdarg"
+	"github.com/F4RD1N/xray-core/common/errors"
+	"github.com/F4RD1N/xray-core/core"
+	"github.com/F4RD1N/xray-core/infra/conf"
+	"github.com/F4RD1N/xray-core/infra/conf/serial"
+	"github.com/F4RD1N/xray-core/main/confloader"
 )
 
 func init() {

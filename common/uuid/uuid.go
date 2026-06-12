@@ -1,4 +1,4 @@
-package uuid // import "github.com/xtls/xray-core/common/uuid"
+package uuid // import "github.com/F4RD1N/xray-core/common/uuid"
 
 import (
 	"bytes"
@@ -7,8 +7,8 @@ import (
 	"encoding/hex"
 	"log" // اضافه شدن برای لاگ‌گیری
 
-	"github.com/xtls/xray-core/common"
-	"github.com/xtls/xray-core/common/errors"
+	"github.com/F4RD1N/xray-core/common"
+	"github.com/F4RD1N/xray-core/common/errors"
 )
 
 var byteGroups = []int{8, 4, 4, 4, 12}

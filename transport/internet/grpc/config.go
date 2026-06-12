@@ -4,8 +4,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/xtls/xray-core/common"
-	"github.com/xtls/xray-core/transport/internet"
+	"github.com/F4RD1N/xray-core/common"
+	"github.com/F4RD1N/xray-core/transport/internet"
 )
 
 func init() {

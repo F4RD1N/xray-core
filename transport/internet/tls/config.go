@@ -14,12 +14,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xtls/xray-core/common/errors"
-	"github.com/xtls/xray-core/common/net"
-	"github.com/xtls/xray-core/common/ocsp"
-	"github.com/xtls/xray-core/common/platform/filesystem"
-	"github.com/xtls/xray-core/common/protocol/tls/cert"
-	"github.com/xtls/xray-core/transport/internet"
+	"github.com/F4RD1N/xray-core/common/errors"
+	"github.com/F4RD1N/xray-core/common/net"
+	"github.com/F4RD1N/xray-core/common/ocsp"
+	"github.com/F4RD1N/xray-core/common/platform/filesystem"
+	"github.com/F4RD1N/xray-core/common/protocol/tls/cert"
+	"github.com/F4RD1N/xray-core/transport/internet"
 )
 
 var globalSessionCache = tls.NewLRUClientSessionCache(128)

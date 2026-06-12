@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/xtls/xray-core/common/serial"
+	"github.com/F4RD1N/xray-core/common/serial"
 )
 
 var (

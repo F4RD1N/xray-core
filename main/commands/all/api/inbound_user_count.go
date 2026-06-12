@@ -1,8 +1,8 @@
 package api
 
 import (
-	handlerService "github.com/xtls/xray-core/app/proxyman/command"
-	"github.com/xtls/xray-core/main/commands/base"
+	handlerService "github.com/F4RD1N/xray-core/app/proxyman/command"
+	"github.com/F4RD1N/xray-core/main/commands/base"
 )
 
 var cmdInboundUserCount = &base.Command{

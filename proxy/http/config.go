@@ -3,7 +3,7 @@ package http
 import (
 	"google.golang.org/protobuf/proto"
 
-	"github.com/xtls/xray-core/common/protocol"
+	"github.com/F4RD1N/xray-core/common/protocol"
 )
 
 func (a *Account) Equals(another protocol.Account) bool {

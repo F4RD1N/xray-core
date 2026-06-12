@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/xtls/xray-core/app/log"
-	"github.com/xtls/xray-core/common"
-	clog "github.com/xtls/xray-core/common/log"
-	"github.com/xtls/xray-core/testing/mocks"
+	"github.com/F4RD1N/xray-core/app/log"
+	"github.com/F4RD1N/xray-core/common"
+	clog "github.com/F4RD1N/xray-core/common/log"
+	"github.com/F4RD1N/xray-core/testing/mocks"
 )
 
 func TestCustomLogHandler(t *testing.T) {
